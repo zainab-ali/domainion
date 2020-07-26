@@ -1,0 +1,11 @@
+name: domainion
+version: 0.1.0
+
+dependencies:
+  - base
+  - newtype-generics == 0.5.4
+  - lens == 4.19.2
+
+executable:
+  main: Main.hs
+  source-dirs: src
