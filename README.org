@@ -1,0 +1,203 @@
+* Domainion
+A domain specific language for deck building games
+
+** Motivation
+
+There's no precise definition of a deck builder.  It's a sort of competitive card game that involves moving cards around in order to assemble a combination of cards, which are usually used to get more cards.  *Dominion* is the mother of all deck building games, on which all others are inspired.
+
+*** A description of dominion
+
+*** Motivation continued
+
+ Suppose we wish to create a Dominion-inspired deck building game (this is a tautology - all deck building games are Dominion-inspired!).  We need a way of modeling cards and the actions they can perform.
+
+ Imagine you're in a game jam.  Quick!  You have 5 minutes to code up this card!  What would you do?
+
+ As a pure functional Haskell programmer, you'll probably write something like this:
+
+ #+begin_src haskell
+
+     data Card = Card {
+        _name :: String,
+        _action :: Action,
+        _description :: String
+        _cardType :: CardType
+     }
+
+   type Action = StateT Game IO ()
+
+   data Game = Game {
+      _currentPlayer :: Player,
+      _others :: [Player],
+      _supply :: [Card],
+      _trash :: [Card]
+   }
+
+   data Player = Player {
+      _gold :: Int,
+      _buys :: Int,
+      _actions :: Int,
+      _deck :: [Card],
+      _hand :: [Card],
+      _discard :: [Card]
+   }
+
+   gameLoop :: IO ()
+   gameLoop = ...
+ #+end_src
+
+Each card has an =Action= which is ultimately a Haskell function
+
+#+begin_src haskell
+marketAction :: Action
+marketAction = ...
+#+end_src
+
+
+If you had 5 minutes, or a day, or a week to create a specific game, this code would be perfectly well.
+
+Imagine instead that you're creating a deck building engine - you expect to design hundreds of such cards. (Dominion, with all of it's expansions, has over 500).  Not only that, you wish to be able to experiment with different mechanics as you design them - you might introduce a new field to your card, for example, and expect.  Each expansion introduces a new mechanic, but is still needs to be compatible with the initial game, and usually all other expansions.
+
+The landscape of our problem changes from producing something quickly and efficiently, to a problem of maintenance and extension.
+
+*** Maintenance
+ - Can we generate a rulebook exactly what each card does?
+ - More ambitiously, can we generate it's description?
+ - How can we tell if a new card is exactly the same as an existing one?
+ - Is there a way of telling if a given combination of cards is "fair"?
+ - Can we ensure that an action is sensible within the rules of the game (e.g. doesn't destroy cards, or construct arbitrary ones)?
+
+Using Haskell functions to represent our card actions is problematic, as it doesn't allow us to answer these questions.  A domain specific language is a better fit.
+
+*** What is an embedded DSL?
+A language is a collection of terms (syntax) that can have multiple interpretations (semantics).
+A domain specific language is a language specific to a given problem (domain).
+
+If we look at the cards in the base dominion set, we can see they they share some natural language terms.  This gives us a clue to what our DSL might be like.
+
+/A common misconception is that we aren't trying to interpret these descriptions as code - natural language is vague, contextual and thus notoriously difficult to interpret.  Our DSL might look very different./
+
+There are numbers here, and conditions.  We reference cards, and piles of cards.  However, the language isn't that simple.  For example *library* and *council room*, or *beurocrat*.  If we can model this as a language, it needs to support variables, control flows.  The technique we use to design this needs to be powerful enough to model these.
+
+There are a bucketful of DSLs written in Haskell, some of which you might have already used.
+
+**** TODO Does this give the reader the correct mindset?
+
+ For this talk our DSL will have two interpreters:
+  - A printer, which will produce a string
+  - An evaluator, which will produce an =Action= function
+
+*** Final tagless encoding
+
+One way of modeling this is to use datatypes
+
+/Insert the initial encoding/
+
+This approach is quite nice to start with because it's simple.
+ - There's a separation between the syntax and the semantics
+ - We can interpret the term in multiple ways
+ - It's compositional - a term is made up of other terms, and knows little about the terms that make it up.  We can interpret this without context.
+
+But poses problems for extension.  Let's say we have a language of booleans too.  Putting these two together is hard.
+
+/Insert the final encoding/
+
+Our syntax is a typeclass.  Our semantics (interpreters), are instances of this typeclass, coupled with functions that make them up.
+
+What if we want to extend this language?  That's easy!  We just extend the typeclass.
+
+**** TODO What about fixed points?
+
+**** TODO In all honesty, I haven't explored the extension of the initial encoding too much
+
+Final tagless encodings just seemed an interesting approach.
+
+*** Our first language: resources
+
+    Tackling our larger DSL would be more than we can chew.  Let's split it up into smaller components.  Let's take these statements
+
+#+begin_example
++1 action
++1 buy
+#+end_example
+
+And consider how to construct them.  We already have a language of integers.  =action= and =buy= don't belong to this.  Let's construct a language of resources
+
+/The resource language/
+
+Can we compose these languages?
+
+/A naive attempt/
+
+Remember that our interpreter for our int language was the identity function.  Not so for our interpreter for our Resource language.
+
+/Write a (->) interpreter for =Int= and have our evaluator return a =Game -> Int=/
+
+Provided we have the same interpreter, we can compose the languages
+
+Is this what we want?  Can I use this function to add 1 to the action count.  No, I get the result of adding one to the action count, but I don't know what to do with that.  Not only that, I can't (without inspection), figure out that the action count is what I need to update.
+
+When we refer to a resource, we're actually referring to something *mutable*.  In functional programming, we don't mutate, but we do modify.  We need a way of setting the resource (Int -> Game).  Such that we end up with a function from Game -> Game.
+
+/embedding/
+
+
+**** TODO This is a difficult concept to grasp
+
+What about composing these statements?
+
+/example typeclass/
+
+Does this look familiar to you?  This is a =Semigroup=.  Whenever you're designing these DSLs, make sure you take a long hard look at how things compose.  It's very likely that there's an existing typeclass that you can make use of.
+
+*** Our second language: movement
+
+Let's first write the predicate.
+
+We've already looked at integers.  We can model the properties of a card in a similar way to resources.
+But now we have a problem in composition.  We can construct statements that are syntactically valid, but make no sense.
+
+This is because our language is untyped.  All statements can be inserted in all positions.  We need types.  These are fairly easy to add
+
+/Typed resources/
+
+We can now interpret these statements to a =Card -> Bool= predicate, as well as a string.
+
+We're reusing our =Int= language in two parts.  Writing out integers and booleans might have seemed cumbersome, but they're very useful to have.
+
+With our predicate, we're now ready to tackle a language of motion. =Gain= a card means to choose a card from the supply pile to your own discard pile.
+In other words, we're moving from pile to pile.  Let's construct a language of piles.
+
+/Pile language/
+
+This looks very much like our Resource and Card languages - they aren't composable, and simply provide access to fields.
+
+And now the interesting part: composition!
+
+Let's naively attempt to write something
+
+#+begin_src
+pick :: repr Pile -> repr Bool -> repr Card
+put :: repr Card -> repr Pile -> repr ()
+#+end_src
+
+Our statements might be
+=put (pick supply (+ 4))=
+
+Any ideas?
+
+=repr Pile= is also something mutable - it doesn't belong in our language, but lives in it's own one.  It should be an =embedded term=.
+The card predicate too is something in it's own language.
+
+Does the language of motion need to be it's own thing?
+
+We can interpret it the same, and can use all (typed) terms in the same position.  It can be part of the dominion language.
+
+Finally, we have a semblance of a dominion language that we can use to model cards!
+
+Because this is a lot to digest, here's a picture of my cat.
+ - Tagless final encoding
+ - Composition
+ - Embedding
+
+This is still, on the scale of the problem, quite basic.
