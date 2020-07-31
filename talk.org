@@ -1,0 +1,61 @@
+* Talk
+A bullet point representation of the reasoning of the talk
+** Motivation
+   :PROPERTIES:
+   :code:    [[file:src/GameJam.hs][file:~/haskell/domainion/src/GameJam.hs]]
+   :END:
+ - Casual introduction to deck builders
+ - A solution using monad transformers
+   - =StateT Game IO ()= to represent evaluation
+ - The problem of maintenance and extension
+   - Adding hundreds of cards, and expansion packs with different mechanics
+   - Making our life simple: generation
+** Easing in
+ - Postulate how we generate a description and evaluator for an int lang
+ - Introduce initial DSLs as a solution
+ - Problem with extension
+ - Final encoding as an alternative
+*** Initial: separation between the syntax and semantics
+*** Composition
+*** TODO Why SYM
+** Agenda
+ - Prepare to launch: final tagless encoding
+   - This is no easy task
+   - Variables, recursion, control flow (fun!)
+** Final tagless encoding: types
+ - First take a look at the market card
+ - Statement =+1 action= is decomposed into a =Resource= and =Int= dsl in an overall =Statement= dsl
+ - Attempt at combinations: we need them to have different types
+   - We can't even write a valid version
+   - We can write invalid constructs
+ - Whizz through optics (getter / setter) and using types in our syntax tree
+ - Write an evaluator and a description printer
+   - An aside on newtype - we need to use this to print
+*** Summary
+ - aim to write =pretty= and =eval= from a single representation
+ - domain specific language
+ - Final tagless encoding
+ - untyped languages
+ - typed language =StatementSYM=
+   - modify using lenses
+ -
+** Composition
+ - We want to do one and then the other
+ - Does this signature look familiar to anyone? : we can use =Semigroup= and we don't need to write this ourselves
+   - We can insert a space / newline
+** Motion
+ - Examine natural language: =Bool=, =Card=, =Pile=
+ - =Pile= is mutated.  What do we need?  A =Lens=!
+ - We also have a predicate for picking
+   - There's something I really don't like about this - it's something that I couldn't pinpoint before - why does cardp need to be stateful
+   - Use sub-languages: a langauge within a language within a language - turtles all the way down
+   - We can use this trick too.  We can use our =id= interpreter
+ - And we can get rid of all those types on =Resource=
+*** Take
+** Motion: take and put
+ - Now we can compose a take
+ - And we can compose a put
+** Break
+** Here there be dragons
+** What if we want to take multiple cards?
+ - Mine: refer to a previous card
