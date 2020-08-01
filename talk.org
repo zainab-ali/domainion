@@ -1,49 +1,78 @@
 * Talk
-  A bullet point representation of the reasoning of the talk
-** What is a deck builder?
-   - A card game, everyone tries to build a deck of cards.  Each player has a deck of cards that they cycle through, and they're trying to add more cards to their deck
-   - There's a central supply pile in the middle
-***  Dominion
-** What are the cards like?
-   - Cards have a _value_ associated with them - they can buy other cards (they also have a _cost_ for when you buy them)
-   - They also have an _action_, something that allows you to draw more cards and play them
-     - The actions are what makes dominion interesting.
-     - You're trying to find decent combinations that will get you the most money
-*** Cards
-    Workshop, market, mine
-** Jam time!
-   - Imagine that you're in a game jam.  You're challenge: coding up dominion, specifically the logic for this _market_ card
-   - What code would you write?
+#+begin_src elisp
+(setq-local column-enforce-column 50)
+#+end_src
 
+#+RESULTS:
+: 50
+
+  A bullet point representation of the reasoning of the talk
+** Games are programs
+
+   An area that I've always been in is game design.  I started coding games in Java, then tried Scala, and Rust and Haskell.  It's a space of interesting problems.  One place that I get inspiration from is board games.
+
+I enjoy playing board games.  I don't mean Monopoly, which most people agree is a terrible gameplay - if those are the only ones you know, go down to your local board game shop.  There are a wealth of more interesting ones.
+
+Whenever I play a particularly strategic board game, I always get a thought.  It's a thought that all secretly programmers have when playing board games.
+
+*** Board game pay
+** The thoughts of programmers : I should code this
+
+I should /code/ this
+
+That's not surprising at all.  A board game is essentially a well defined process, and a process is a /program/.
+
+Dominion is a perfect example of this.  It's a card game during which you compete for the biggest kingdom, and you do so by playing cards.  Each card has a program on it.  As a programmer, when you play a card, you realize that you're simply executing this program.  And as programmers, whenever we recognize a program, we want to code it.
+
+
+*** Card
+ - The festival card
+** What are the cards like?
+You might be wondering, /how/ is it a program?
+It's a set of instructions that you follow, each of which changes some part of the game state.
+For example, incrementing the number of /actions/ you can play, or the number of things you can /buy/.
+
+The more complex cards are also programs.  The game state consists of piles of cards.  The instruction gain a card is a program which moves a card from one pile to another.  As well as actions, cards have properties, such as cost, that are referred to.
+*** Cards
+    Workshop, festival, mine
+** Jam time!
+   - Imagine that you're in a game jam.  You're challenge: coding up the program on this _festival_ card. What would you write?
+*** Card
+ - The festival card
 *** Jam time!
 ** Jam time! Solution
    - Probably something like *this*.
    - We have a game state =Game= , and our code is a monad transformer =StateT Game IO=.
      - There's some user input, and there's some game state
    - This is a perfectly acceptable solution
-     - Imagine instead that you're trying to /design/ these games, and you expect to create hundreds of such cards (Dominion in total has over 500).  Not only that, once you've created a base game, you intend to extend it with different mechanics - you might add a new card type, or change the way the point system works.  Even if an extension introduces a new mechanic, it still needs to be compatible with the initial set of cards, and usually all other extensions.
-       - The landscape of our problem changes from producing something fast and functional to a problem of maintenance and extension.
+     - Imagine instead that you're trying to /design/ these games, and you expect to create hundreds of such cards (Dominion in total has over 500).  Not only that, once you've created a base game, you intend to extend it with different mechanics - you might add a new card type, or change the way the point system works.  These extensions still need to be compatible with the initial set of cards, and usually all other extensions.
+
+Coding the program is itself not difficult, but coding it in a way that is maintainable and extensible /is/.
 *** *code* of a =StateT Game IO=
     :PROPERTIES:
     :code:     [[file:src/GameJam.hs][file:~/haskell/domainion/src/GameJam.hs]]
     :END:
 
-    #+begin_src haskell
-      marketAction :: StateT Game IO ()
-      marketAction =
-        drawCard
-          >> plusAction
-          >> plusBuy
-          >> plusGold
-    #+end_src
+    #+begin_example haskell
+festivalAction :: StateT Game IO ()
+festivalAction =
+  plusActions 2
+    >> plusBuy 1
+    >> plusGold 2
+    #+end_example
 ** A maintainable solution
-   - Can we generate a rulebook with a description of exactly what each card does?
-   - How can we tell if a new card is exactly the same as an existing one?
-   - More ambitiously, can we generate it's description?
-   - Can we validate that a card _can_ be run?
-   - Can we ensure that an action is sensible within the rules of the game (e.g. doesn't destroy cards, or construct arbitrary ones)?
-   - We certainly can't do this with our current action function - we can only run it
-   - We have no way of inspecting it to find out what it's actually doing
+
+When searching for a maintable solution, we should look for two things:
+ One. To do less work
+ Two. Make sure our work is correct
+
+As well as defining the card program, we also need to write a description, and a much more detailed explanation in a rulebook of what it does.  Is there some way we can generate this?
+
+Some of these programs have /preconditions/.  I can't choose a card, for example, if I have no cards left.  How can we identify these, and so validate that a card is actually playable?
+
+We might accidentally introduce bugs in our program, in which, when moving cards around, we lose a card.  How can we ensure that an action can't destroy cards, or create arbitrary ones?
+
+We certainly can't do that with our current approach because there's no way to /inspect/ a monad transformer.
 
 *** A maintainable solution
     How can we:
@@ -55,29 +84,35 @@
    :PROPERTIES:
    :time-1:   5 minutes
    :END:
-   - But what we can do is have some central representation of an action, different to a =StateT=, and interpret that to a function
-   - We can also interpret it to a =Description=, or a validation function
-   - We can interpret it into something that can be compared for equality
-   - In this way, we can have a central idea of an action, and many interpreters
+   - But what we can do is have some central /representation/ of a program, something that /interprets/ to a monad transformer for evaluation, and also interprets to a description for printing, and even a data type for equality checks.
 
-*** One action to rule them all
+*** One repr to rule them all
     That interprets to
     - A =Pretty= description
     - An =Action= data structure for equality checks
     - A =StateT Game IO ()= for evaluation
 ** What might this representation look like?
-   - What might this action look like?  Looking at a *card*, It would be composed of statements. Each of these are composed of smaller expressions,
-   - Looked through this lens, what we find is a _language_. Our central idea of an action represents the _syntax_ of our language, and our interpreters are its _semantics_.
-   - All problems of functional programming are ultimately problems of language design
-*** One language to rule them all
-    - The market card, with highlights on various terms
-    - The title "Syntax" above the card
-    - The title "Semantics" above the interpreted forms
 
-    #+begin_src haskell
-      type Pretty = String
-      type Action = StateT Game IO ()
-    #+end_src
+What might this representation look like?
+
+To answer this question, we need to think about how we compose it.
+
+Looking at a program, we see that it's built up of many smaller programs.  These are build up of expressions.  We refer to values, such as literal integers, and properties of cards.
+
+If we look at a card in this way, what we see is a /language/.  It's a very precise language, specific to the domain of the card game.
+
+Our representation is simply the syntax of this language.  Our interpreters are it's /semantics/.
+
+*** One language to rule them all
+**** TODO Highlight the card
+     - The festival card, with highlights on various terms
+     - The title "Syntax" above the card
+     - The title "Semantics" above the interpreted forms
+
+     #+begin_example haskell
+     type Pretty = String
+     type Action = StateT Game IO ()
+     #+end_example
 
 ** The problem
    :PROPERTIES:
@@ -91,39 +126,54 @@
    - This language isn't so simple.  There's variables, conditionals and recursion
    - We won't be able to design all of these features within the time, but we'll be able to see a path towards them
 *** Towards a domain specific language
-    - Embedded in Haskell
-    - Interpreters:
-      - pretty description
-      - An evaluator
+Design a /domain specific language/ that is /embedded/ in Haskell
+Interpret it to:
+  - a pretty description
+  - an evaluator
     On the left is the mine card
 ** An initial attempt
-   - Let's start by simplifying our problem, and slowly building it up
-   - We saw integers in our language - let's make a simple language for adding integers
-   - We might represent our syntax as a data type
+
+Let's start by simplifying our problem and slowly building up.
+We saw integers in our language, and are familiar enough with modeling those.
+How would we design a language for integer addition?
+
+We'd probably represent our syntax as an expression tree with nodes for addition and leaves for literals
+
+
+*** An initial attempt
+    #+begin_example haskell
+data Exp = Lit Int | Add Exp Exp
+
+-- 1 + 2 + 3
+exp = Add (Add (Lit 1) (Lit 2)) (Lit 3)
+
+eval :: Exp -> Int
+eval (Lit i) = i
+eval (Add x y) = eval x + eval y
+
+pretty :: Exp -> String
+pretty (Lit i) = show i
+pretty (Add x y) = "("
+  ++ pretty x ++ " + "
+  ++ pretty y ++ ")"
+
+
+
+eval exp
+-- 6
+
+pretty exp
+-- "((1 + 2) + 3)"
+    #+end_example
+
+** Interpreters
+
+Our interpreters would be functions that recurse over that tree.
+In order to evaluate, we simply call +.
+To pretty print, we concatenate strings.
+
    - This is known as an _initial encoding_
    - This seems like a good solution, but it has problems when it comes to extension
-*** An initial attempt
-    #+begin_src haskell
-
-      data Exp = Lit Int | Add Exp Exp
-
-      eval :: Exp -> Int
-      eval (Lit i) = i
-      eval (Add x y) = eval x + eval y
-
-      pretty :: Exp -> String
-      pretty (Lit i) = show i
-      pretty (Add x y) = "(" <> pretty x <> " + " <> pretty y <> ")"
-
-
-      exp = Add (Add (Lit 1) (Lit 2)) (Lit 3)
-
-      eval exp
-      -- 6
-
-      pretty exp
-      -- "((1 + 2) + 3)"
-    #+end_src
 
 ** Extension
    - Let's say we extend it with subtraction. You have bad cards that take away your resources!
@@ -131,13 +181,29 @@
    - There's a way of avoiding this using fixed-points, but it's not easy
 *** Extension
 
-    #+begin_src haskell
-      data MinusExp = Minus MinusExp MinusExp | Wrap Exp
+    #+begin_example haskell
+data MinusExp = Minus MinusExp MinusExp | Wrap Exp
 
-      exp = Add (Minus (Wrap (Lit 1)) (Wrap (Lit 2))) (Lit 3)
-      --    • Couldn't match expected type ‘Exp’ with actual type ‘MinusExp’
-    #+end_src
+-- (1 - 2) + 3
+exp = Add (Minus (Wrap (Lit 1)) (Wrap (Lit 2)))
+          (Lit 3)
+ -- Couldn't match expected type ‘Exp’ with
+ -- actual type ‘MinusExp’
+    #+end_example
 ** A final attempt
+
+Modelling DSLs as data types has its problems.  We could aleviate these by exploring other ways of structuring our datatype - using fixed points instead of recursive structures.
+Instead, we're going to try our hand at a different, more intriguing encoding.
+
+We're going to model our DSL as a typeclass.
+
+It can have functions corresponding to our primitives in out previous data type, and we can construct expressions by calling these functions.
+
+Extending the DSL with subtraction is then simply a matter of using two typeclasses together.
+
+
+There's another encoding we could try, known as
+
    - There's another way of modelling DSLs, known as _final_ encoding, purely because it has parallels to the initial one
    - Instead of representing our syntax using recursive data, what if we represent it using a typeclass?
    - If we use a typeclass, we can compose typeclasses together easily
@@ -146,104 +212,145 @@
 ***** TODO Final syntax for IntSYM and MinusSYM
 
 
-      #+begin_src haskell
-                class IntSYM repr where
-                  lit :: Int -> repr
-                  (+) :: repr -> repr -> repr
+      #+begin_example haskell
+class IntSYM repr where
+  lit :: Int -> repr
+  (+) :: repr -> repr -> repr
 
-              expr :: IntSYM repr => repr
-              expr = (lit 1 + lit 2) + lit 3
+expr :: IntSYM repr => repr
+expr = (lit 1 + lit 2) + lit 3
 
 
-            class MinusSYM repr where
-              (-) :: repr -> repr -> repr
+class MinusSYM repr where
+  (-) :: repr -> repr -> repr
 
-        expr :: (IntSYM repr, MulSYM repr) => repr
-        expr = (lit 1 * lit 2) + (lit 3)
-      #+end_src
+expr :: (IntSYM repr, MulSYM repr) => repr
+expr = (lit 1 - lit 2) + (lit 3)
+      #+end_example
 ** A final interpreter
-   - How do we interpret this?  We _instantiate_ the typeclass.  The instance type is the same as our interpreter's resulting value
+
+We can extend our syntax, but how do we actually interpret these.
+
+A typeclass is a group of function definitions.  A specification, almost, that is separate from its implementation.
+When viewed in this way, it's a great representation for a language syntax.  The syntax has no /meaning/.
+
+The meaning of a typeclass - what it actually does - is given by a typeclass instance.
+So to interpret our language - to add meaning - we simply /instantiate/ the typeclass.
+
+When we want to interpret our language with a given interpreter, we tell Haskell's type system what data type to use.
+     The instance type is the same as our interpreter's resulting value
    - Our actual interpreter function is something that, given a piece of syntax, "collapses" the type down to itself.
    - In other words, it's just the identity function
-*** A final attempt
+*** TODO Better expanation
 ***** TODO Final interpreter instance and identity function
 
-      #+begin_src haskell
-            instance IntSYM Int where
-              lit = id
-              (+) = (P.+)
+      #+begin_example haskell
+instance IntSYM Int where
+  lit = id
+  (+) = (Prelude.+)
 
-        instance IntSYM String where
-          lit = show
-          x + y = "(" <> x <> " + " <> y <> ")"
+eval :: Int -> Int
+eval = id
 
-              eval :: Int -> Int
-              eval = id
+eval expr
+-- 6
+
+instance IntSYM String where
+  lit = show
+  x + y = "(" ++ x ++ " + " ++ y ++ ")"
 
 pretty :: String -> String
 pretty = id
 
-          pretty expr
-          -- "((1 * 2) + 3)"
-      #+end_src
+pretty expr
+-- "((1 + 2) + 3)"
+#+end_example
 
 ** Resources
    - We've seen a really simple example, how might we actually use it?
-   - Let's look at one of the simplest cards - _market_
+   - Let's look at one of the simplest cards - _festival_
    - If we played this card, we'd get one more action to play, to more coins to use to buy cards, and even one more thing to buy
    - We already have a language for =IntSYM= , we need one for resources
    - Let's make a =ResourceSYM=
 *** Modifications
-    - A picture of the market card
-#+begin_src haskell
+    - A picture of the festival card
+#+begin_example haskell
 action + lit 1
 gold + lit 1
 buy + lit 1
-#+end_src
+#+end_example
 ** A Resource language
    - We can construct sentences using this and =IntSYM=
    - We can print those
 
 *** A resource language
 
-#+begin_src haskell
-  class ResourceSYM repr where
-    action :: repr
-    buy :: repr
-    gold :: repr
+#+begin_example haskell
+class ResourceSYM repr where
+  action :: repr
+  buy :: repr
+  gold :: repr
 
-  plusOneAction :: (IntSYM repr, ResourceSYM repr) => repr
-  plusOneAction = action + lit 1
+plusTwoActions :: (IntSYM repr,
+                   ResourceSYM repr) => repr
+plusTwoActions = action + lit 2
 
-  instance ResourceSYM String where
-    action = "action"
+instance ResourceSYM String where
+  action = "action"
     ...
 
-   pretty plusOneAction
-   -- "(action + 1)"
-#+end_src
+   pretty plusTwoActions
+   -- "(action + 2)"
+#+end_example
+
+*** TODO Skip pretty printing
+
+We can construct the syntax, but what about the interpreter?
+
+Our evaluator for our program is a monad transformer.
+If we attempt to interpret to this type, we'll see that we can't make a sensible program
+
+
+
 ** Modifications: evaluation
    - What about evaluation?  We need to ultimately end up with a monad transformer.  Our stack should ultimately remain the same.
    - There's no way of doing this.  There's a problem here.
    - We actually have a bigger problem here.  There are some statements in this language that don't make sense.
 *** Evaluation
-    #+begin_src haskell
-      eval :: StateT Game IO () -> StateT Game IO ()
+    #+begin_example haskell
+eval :: StateT Game IO () -> StateT Game IO ()
 
-      instance IntSYM (StateT Game IO ()) where
-        lit i = ...
-    #+end_src
+instance IntSYM (StateT Game IO ()) where
+   lit i = ...
+#+end_example
 
-    #+begin_src haskell
+    #+begin_example haskell
       action + 1
       action
       1
       1 + 1
-    #+end_src
+    #+end_example
 ** Evaluation with types
    :PROPERTIES:
    :time:     10 minutes
    :END:
+
+If we can express invalid constructs in our syntax, we need to constrain it such that only certain forms are valid.
+In Haskell, we're very familiar with this - we use types.
+
+A modification statement needs to be made of a resource, and a modification function.
+So if I have a resource a, and a function on a that modifies it.
+
+The type of the modification function, for an integer resource, is Int -> Int
+
+Literals themselves must be typed as integers.
+
+What about the type of our resource itself?
+
+
+The way we do this`
+These problems indicate that we need to constrain our statements.
+
    - What do we do when there are statements that don't make sense?  We use think in types.
      - lit should be a type Int
      - + 1 should be of type Int -> Int
@@ -252,23 +359,23 @@ buy + lit 1
 
 *** Thinking with Types
 
-    #+begin_src haskell
-      1 :: Int
-      + 1 :: Int -> Int
-      action + 1 :: StateT Game IO ()
-      action :: ?
-    #+end_src
+    #+begin_example haskell
+lit 1 :: repr Int
+(+ lit 1) :: repr Int -> repr Int
+action + lit 1 :: repr ()
+action :: ?unknown
+    #+end_example
 
 ** The type of action
    - It's more like a reference to something mutable.  We can get it's value, but we can also increment it.
    - In other words, it's a function to get and set a specific thing.  It's a _Lens_
      - If you're not familiar with optics, don't worry.  They're just getter and a setter.
 
-*** The type of action: Optics
+*** Optics
 
-    #+begin_src haskell
+    #+begin_example haskell
       action :: Lens Game Int
-    #+end_src
+    #+end_example
 
 ** Composition
    - By splitting out our types, we've destroyed our + composition, so we need a new way of composing these things
@@ -277,14 +384,46 @@ buy + lit 1
    - We don't need to rewrite our typeclass, but we do need to massage some types
 *** Composition
 
-#+begin_src haskell
-    class StatementSYM repr where
-      modify :: repr (Lens Game Int) -> (repr Int -> repr Int) -> repr ()
+#+begin_example haskell
+class StatementSYM repr where
+  modify :: repr (Lens Game Int)
+            -> (repr Int -> repr Int)
+            -> repr ()
 
-  modify action (lit 1 +
-  modify (lit 1) (lit 1 +) -- doesn't compile
-  modify gold gold -- doesn't compile
-#+end_src
+modify action (+ lit 1)
+
+modify (lit 1) (+ lit 1)
+modify gold gold
+-- do not compile
+#+end_example
+** TODO Evaluation
+
+#+begin_example
+instance IntSYM (StateT Game IO Int) where
+   lit i = pure i
+#+end_example
+
+#+begin_example
+instance ResourceSYM
+          (StateT Game IO (Lens Game Int)) where
+   action = pure actionLens
+#+end_example
+
+#+begin_example
+instance StatementSYM (StateT Game IO) where
+    modify mlens f = do lens <- mlens
+                         next <- f (use lens)
+                         S.modify (set lens next)
+#+end_example
+** TODO Composition
+
+#+begin_example
+plusTwoActions :: (
+  ResourceSYM (repr (Lens Game Int)),
+  IntSYM (repr Int),
+  StatementSYM repr) => repr ()
+plusTwoActions = modify action (+ lit 2)
+#+end_example
 ** More Composition
    - we've managed to write a single statement, but there are actually three here. we need a way of combining them
    - we could add a function like =<>= to our language.
@@ -294,13 +433,13 @@ buy + lit 1
    - you may notice this list of typeclasses is getting a bit long
    - we can condense this into actionsym
 *** More composition
-    #+begin_src haskell
-      class StatementSYM repr where
-         ...
-         compose :: repr -> repr -> repr
-    #+end_src
+    #+begin_example haskell
+class StatementSYM repr where
+   ...
+   compose :: repr -> repr -> repr
+    #+end_example
 ** Semigroup
-#+begin_src haskell
+#+begin_example haskell
         instance Semigroup Pretty where
           x <> y =  x ++ "\n" ++ y
 
@@ -308,19 +447,24 @@ buy + lit 1
         (<>) = liftA2 (<>)
 
 
-    marketAction :: (
-      ResourceSYM (repr (GameLens Int)),
-      IntSYM (repr Int),
-      StatementSYM repr,
-      Semigroup (repr ())) => repr ()
-    marketAction = plusOneAction' <> plusOneGold <> plusOneBuy
+festival :: (
+  ResourceSYM (repr (GameLens Int)),
+  IntSYM (repr Int),
+  StatementSYM repr,
+  Semigroup (repr ())) => repr ()
+festival =
+  plusTwoActions
+    <> plusOneBuy
+    <> plusTwoGold
 
-  class (
-    ResourceSYM (repr (GameLens Int)),
-    IntSYM (repr Int),
-    StatementSYM repr,
-    Semigroup (repr ())) => ActionSYM repr
-#+end_src
+class (
+  ResourceSYM (repr (GameLens Int)),
+  IntSYM (repr Int),
+  StatementSYM repr,
+  Semigroup (repr ())) => ActionSYM repr
+
+festival :: ActionSYM repr => repr
+#+end_example
 
 ** The journey thus far
    - we needed a dsl
@@ -330,11 +474,13 @@ buy + lit 1
    - we made use of haskell typeclasses
    - but so far, the cards are pretty simple.  in fact, we've only defined _one_ card in the base dominion set
 *** The journey so far
-    - Explored DSLs
-    - Initial and final encoding
-    - Extending languages
-    - Correctness through types
-    - Existing typeclasses
+eDSLs
+Using data types
+Using type classes
+Extension
+Composition
+Types
+Existing type classes
 ** Moving cards
    - let's take a look at another card: the workshop
    - gain means pick a card from the central pile and move it to your discard pile
@@ -353,65 +499,84 @@ buy + lit 1
     A code snuppet of the types of syntax, pick and put
     An example of a cardSYM and a BooSYM
 
-#+begin_src haskell
-      class MoveSYM repr where
-        pick :: repr (Lens Game [Card]) -> (repr Card -> repr Bool) -> repr Card
-        put :: repr Card -> repr ()
+#+begin_example haskell
+class MoveSYM repr where
+  pick :: repr (Lens Game [Card])
+          -> (repr Card -> repr Bool)
+          -> repr Card
 
-    class BoolSYM repr where
-      (<) :: repr Int -> repr Int -> repr Bool
-      ...
+  put :: repr Card
+         -> repr ()
 
-  class CardSYM repr where
-    value :: repr Int
-    cost :: repr Int
-    ...
-#+end_src
+class BoolSYM repr where
+  (<) :: repr Int -> repr Int -> repr Bool
+  ...
+
+class CardSYM repr where
+  value :: repr Int
+  cost :: repr Int
+  ...
+#+end_example
+
+#+begin_example
+class PileSYM repr where
+  supply :: repr
+  discard :: repr
+  ...
+#+end_example
+
 ** Dangerous state
    :PROPERTIES:
    :time:     15 minutes
    :END:
-   - before we go too far down this route, i want to point out something frustrating
-   - because our evaluator is a statet, all terms in this language also need to be interpreted to a statet game io a.
-   - but there's nothing stateful about a lot of these terms.  there's not even user input in most of them.
-   - nevertheless, we need to _lift_ all of our interpreters into this one
+
+We could go ahead and write interpreters for these, but there's something dissatisying about them.
+We're evaluating these to our MonadTransformer, our stateT, but looking at them, they should not be stateful.
+
 *** Dangerous state
     An example of several interpreters with a monad transformer
 
-#+begin_src haskell
+#+begin_example haskell
+instance IntSYM (StateT Game IO Int) ...
 instance BoolSYM (StateT Game IO a) ...
-instance IntSYM (StateT Game IO a) ...
 instance CardSYM (StateT Game IO a) ...
-#+end_src
+#+end_example
 
 ** Different interpretations
-   - there's another way we could write this.  let's say we want a diffferent interpreter for *this (card -> bool)* term.
-   - let's say we want it to be interpreted to a *function* from card -> bool, but we want the rest of our program to be stateful.
-   - we're essentially saying we need another language - a _different_ language.
-   - when we look back at our card description, this actually makes a lot of sense.  what we see is another language embedded in this one - a language of predicates
-   - we need to define a few other things to do this - a card dsl which is similar to a resource, and booleans, and we can embed that inside a bigger dsl
+In fact, if we look at the original statement we're trying to express, we see that they have their own way of composing.
+We're composing these statements to form predicates.
+
+And a predicate /has it's own language/.
 *** Imagery
     The workshop card.  gain a card costing less than 4, with the syntax costing less than 4 highlighted
 
     An evaluator for a function from Card => Bool
     A language CardP that evaluates to this
 
-#+begin_src haskell
-class (CardSYM repr, BoolSYM repr, IntSYM (repr Int)) => CardP repr
-#+end_src
+#+begin_example haskell
+class (CardSYM repr,
+       BoolSYM repr,
+       IntSYM (repr Int)) => CardPSYM repr
+#+end_example
 ** Embedding languages
+
+Now that we've identified our language, how do we embed it?
    - we want to embed a language of predicates within our language of statements.  how?
    - a language is syntax and semantics.  when we run our pretty printer, we want to interpret that language as a string
      - when we run our evaluator, we want to interpret that language as a function
    - we want to embed the "meaningless" syntax, and choose the interpreter when we interpret the larger language
 *** Turtles all the way down
     - Code for an embedded (forall) dsl
-      #+begin_src haskell
-        data CardPSYMSelf = CardPSYMSelf (forall p. CardP p => p Bool)
+      #+begin_example haskell
+data CardPSYMSelf =
+     CardPSYMSelf (forall p. CardPSYM p => p Bool)
 
 class MoveSYM repr where
-  pick :: CardPSYMSelf -> repr (GameLens [Card]) -> repr Card
-      #+end_src
+  pick :: CardPSYMSelf
+          -> repr (Lens Game [Card])
+          -> repr Card
+  ...
+      #+end_example
 ** Embedding
    - embedding breaks composition.  we can't compose terms of the larger language with the smaller.
    - we have to be very careful that this is what we _want_
@@ -422,22 +587,31 @@ class MoveSYM repr where
 *** Turtles all the way down
     - The final code for pick and put
 
-#+begin_src haskell
-    class MoveSYM repr where
-      pick :: CardPSYMSelf -> PileSYMSelf -> repr Card
-      put :: PileSYMSelf -> repr Card -> repr ()
+#+begin_example haskell
+class MoveSYM repr where
+  pick :: CardPSYMSelf -> PileSYMSelf -> repr Card
+  put :: PileSYMSelf -> repr Card -> repr ()
 
-  instance MoveSYM' (StateT Game IO) where
-    pick (CardPSelf p) (PileSYMSelf pile) =
-      do cards <- use pile
-         let selection = filter p cards
-         card <- chooseOne selection
-         pile %= delete card
-         return card
+instance MoveSYM' (StateT Game IO) where
+  pick (CardPSelf p) (PileSYMSelf pile) =
+    do cards <- use pile
+       let selection = filter p cards
+       card <- chooseOne selection
+       pile %= delete card
+       return card
 
 workshop :: ActionSYM repr => repr ()
-workshop = put discard (pick (cost < lit 4) supply)
-#+end_src
+workshop =
+  put discard
+    (pick
+       (cost < lit 4)
+        supply)
+#+end_example
+
+#+begin_example
+data PileSYMSelf =
+     PileSYMSelf (forall p. PileSYM p => p)
+#+end_example
 
 ** the journey so far
    :PROPERTIES:
