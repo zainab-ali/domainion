@@ -13,13 +13,8 @@ build-type:     Simple
 executable domainion
   main-is: Main.hs
   other-modules:
-      Composition
       Final
-      GameJam
-      Initial
-      Predicate
-      Types
-      Var
+      Model
       Paths_domainion
   hs-source-dirs:
       src

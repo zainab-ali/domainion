@@ -1,8 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-
 -- Template Haskell is required for the 'makeLenses' expansion
 
-module GameJam where
+{-# LANGUAGE RankNTypes #-}
+-- We want to use a Lens in a newtype
+
+module Model where
 
 import Control.Lens
 import Control.Monad.Trans (lift)
@@ -18,22 +20,15 @@ data Game = Game
 
 data CardType = ActionType | Treasure | Victory deriving (Show, Eq)
 
+--TODO: Cards should be parameterized by their card types
+--such that only Treasure cards have a value, Action cards have an action etc.
 data Card = Card
   { _name :: String,
     _description :: String,
     _cardType :: CardType,
     _value :: Int,
-    _cost :: Int,
-    _action :: StateT Game IO ()
-  }
-
-instance Show Card where
-  show (Card name desc tpe value cost _) =
-    "( Card " <> show name <> " " <> show desc <> " " <> show tpe <> " " <>
-    show value <> " " <> show cost <> ")"
-
-instance Eq Card where
-  x == y = _name x == _name y
+    _cost :: Int
+  } deriving (Show, Eq)
 
 data Player = Player
   { _gold :: Int,
@@ -42,43 +37,26 @@ data Player = Player
     _deck :: [Card],
     _hand :: [Card],
     _discard :: [Card]
-  }
-  deriving (Show)
+  } deriving (Show)
 
-type Action = StateT Game IO ()
+
+
+
+-- Lenses.  These must be declared after all models or Template Haskell gives
+-- nonsensical errors
 
 makeLenses ''Game
 makeLenses ''Card
 makeLenses ''Player
 
--- | This version uses a ton of lenses. They aren't necessary, but clean up a
--- lot of boilerplate
--- Don't worry if you wrote something different
-drawCard :: Action
-drawCard = do
-  cards <- use (player . deck)
-  case cards of
-    [] -> lift (fail "You need more cards!")
-    card : rest ->
-      player . deck .= rest
-        >> player . hand %= (card :)
+-- Interpreters
 
-plusAction :: Action
-plusAction = player . actions += 1
+type Action = StateT Game IO ()
 
-plusBuy :: Action
-plusBuy = player . buys += 1
+newtype GameLens a = GameLens (Lens' Game a)
 
-plusGold :: Action
-plusGold = player . gold += 1
 
--- | Some game state to play with
-marketAction :: Action
-marketAction =
-  drawCard
-    >> plusAction
-    >> plusBuy
-    >> plusGold
+-- Card instances
 
 market :: Card
 market =
@@ -87,15 +65,8 @@ market =
       _description = "",
       _cardType = ActionType,
       _value = 0,
-      _cost = 5,
-      _action = marketAction
+      _cost = 5
     }
-
-villageAction :: Action
-villageAction =
-  drawCard
-    >> plusAction
-    >> plusAction
 
 village :: Card
 village =
@@ -104,8 +75,7 @@ village =
       _description = "",
       _cardType = ActionType,
       _value = 0,
-      _cost = 3,
-      _action = villageAction
+      _cost = 3
     }
 
 copper :: Card
@@ -115,8 +85,7 @@ copper =
       _description = "",
       _cardType = Treasure,
       _value = 1,
-      _cost = 3,
-      _action = pure ()
+      _cost = 3
     }
 
 player1 :: Player
@@ -138,6 +107,3 @@ game =
       _supply = [village, market],
       _trash = []
     }
-
-nextGame :: IO ((), Game)
-nextGame = runStateT marketAction game
