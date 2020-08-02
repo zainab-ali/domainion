@@ -29,7 +29,8 @@ data Card = Card
 
 instance Show Card where
   show (Card name desc tpe value cost _) =
-    "( Card " <> show name <> " " <> show desc <> " " <> show tpe <> " " <> show value <> " " <> show cost <> ")"
+    "( Card " <> show name <> " " <> show desc <> " " <> show tpe <> " " <>
+    show value <> " " <> show cost <> ")"
 
 instance Eq Card where
   x == y = _name x == _name y
@@ -50,7 +51,8 @@ makeLenses ''Game
 makeLenses ''Card
 makeLenses ''Player
 
--- | This version uses a ton of lenses. They aren't necessary, but clean up a lot of boilerplate
+-- | This version uses a ton of lenses. They aren't necessary, but clean up a
+-- lot of boilerplate
 -- Don't worry if you wrote something different
 drawCard :: Action
 drawCard = do
@@ -107,7 +109,8 @@ village =
     }
 
 copper :: Card
-copper = Card
+copper =
+  Card
     { _name = "Copper",
       _description = "",
       _cardType = Treasure,
@@ -136,5 +139,5 @@ game =
       _trash = []
     }
 
-game1 :: IO ((), Game)
-game1 = runStateT marketAction game
+nextGame :: IO ((), Game)
+nextGame = runStateT marketAction game
